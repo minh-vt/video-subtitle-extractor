@@ -257,8 +257,12 @@ def ocr_task_producer(
     :param raw_subtitle_path
     """
     cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        # Fallback: OpenCV can't decode this codec (AV1/HEVC/VP9) — use ffmpeg
+    ret = False
+    if cap.isOpened():
+        ret, _ = cap.read()
+    if not ret:
+        if cap:
+            cap.release()
         from backend.tools.ffmpeg_reader import FFmpegReader
 
         cap = FFmpegReader(video_path)

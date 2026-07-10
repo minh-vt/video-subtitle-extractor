@@ -61,8 +61,12 @@ class SubtitleExtractor:
         # 视频路径
         self.video_path = vd_path
         self.video_cap = cv2.VideoCapture(vd_path)
-        if not self.video_cap.isOpened():
-            # Fallback: OpenCV can't decode this codec (AV1/HEVC/VP9)
+        ret, _ = False, None
+        if self.video_cap.isOpened():
+            ret, _ = self.video_cap.read()
+        if not ret:
+            if self.video_cap:
+                self.video_cap.release()
             from backend.tools.ffmpeg_reader import FFmpegReader
 
             self.video_cap = FFmpegReader(vd_path)
