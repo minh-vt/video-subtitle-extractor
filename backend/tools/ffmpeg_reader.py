@@ -32,6 +32,7 @@ class FFmpegReader:
         self._frame_width = 0
         self._frame_height = 0
         self._seek_frame = None
+        self._codec_name = None
         self._opened = self._read_metadata()
 
     # ── metadata via ffprobe ───────────────────────────────────────
@@ -58,7 +59,8 @@ class FFmpegReader:
                     continue
                 self._frame_width = stream.get("width", 0)
                 self._frame_height = stream.get("height", 0)
-                num, den = stream.get("r_frame_rate", "30/1").split("/")
+                self._codec_name = stream.get("codec_name", "")
+                num, den = (stream.get("r_frame_rate", "30/1").split("/"))
                 self._fps = float(num) / float(den)
                 nb_frames = stream.get("nb_frames")
                 if nb_frames:
@@ -152,21 +154,7 @@ class FFmpegReader:
     def _open_pipe(self) -> bool:
         try:
             self._proc = subprocess.Popen(
-                [
-                    "ffmpeg",
-                    "-i",
-                    self.video_path,
-                    "-f",
-                    "rawvideo",
-                    "-pix_fmt",
-                    "bgr24",
-                    "-vsync",
-                    "0",
-                    "-an",
-                    "-v",
-                    "quiet",
-                    "pipe:1",
-                ],
+                self._ffmpeg_args(),
                 stdout=subprocess.PIPE,
                 bufsize=10**8,
             )
@@ -174,6 +162,23 @@ class FFmpegReader:
         except FileNotFoundError:
             print("ffmpeg not found in PATH. Install ffmpeg or use CPU mode.")
             return False
+
+    def _ffmpeg_args(self) -> list:
+        """Build ffmpeg command line flags for this video."""
+        args = ["ffmpeg"]
+        # Force software decoder for codecs where hardware decode commonly fails
+        if self._codec_name == "av1":
+            args += ["-c:v", "libdav1d"]
+        args += ["-i", self.video_path]
+        args += [
+            "-f", "rawvideo",
+            "-pix_fmt", "bgr24",
+            "-vsync", "0",
+            "-an",
+            "-v", "quiet",
+            "pipe:1",
+        ]
+        return args
 
     def _skip_frames(self, count: int):
         """Read and discard count frames from the pipe."""
